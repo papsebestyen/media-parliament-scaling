@@ -23,6 +23,8 @@ bigram_keyness <- bi_dtm %>% textstat_keyness(target=1, measure="chi2")
 
 textplot_wordcloud(dfm_group(bi_dtm, groups = side), comparison = TRUE, max_words = 100)
 
+rm(toks_2gram)
+
 # trigramm 
 
 toks_3gram <- tokens_ngrams(parl_tokens, n = 3)
@@ -32,6 +34,8 @@ dtm_3gram <- dfm(toks_3gram) %>%
   dfm_trim(groups = side, min_termfreq = 20) 
 
 trigram_keyness <- dtm_3gram %>% textstat_keyness(target=1,measure="chi2") 
+
+rm(toks_3gram)
 
 wordplot <- textplot_keyness(trigram_keyness,n=30,min_count = 5,margin=0.15)
 

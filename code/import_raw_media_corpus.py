@@ -69,7 +69,7 @@ corpus_files.remove("index_v0_9_1.pkl")
             (
                 pd.read_pickle(media_corpus_folder + corpus_files[4])
                 .loc[
-                    lambda x: (x["date"] >= "2010-01-01")
+                    lambda x: (x["date"] >= "2015-09-18")
                     & (x["section"].isin(["belfold", "kozelet", "gazdasag"]))
                 ]
                 .filter(["url", "date", "content"])
