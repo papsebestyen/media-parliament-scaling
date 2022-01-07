@@ -7,12 +7,13 @@ import datetime as dt
 
 warnings.filterwarnings("ignore")
 
+
 def format_data(df):
     return (
         df.assign(
-            site=lambda x: x["site_month"].str.split("_").str[0],
+            site=lambda x: x["site_quarter"].str.split("_").str[0],
             date=lambda x: pd.to_datetime(
-                x["site_month"].str.split("_").str[1:3].str.join(sep=""), format="%Y-%m"
+                df["site_quarter"].str.replace(" ", "").str.split("_").str[1]
             ),
             se=lambda x: x["se.fit"],
             slant=lambda x: x["fit"],
@@ -44,7 +45,7 @@ def detrend_time_series(df):
     )
 
 
-def smooth_time_series(df, alpha=0.12):
+def smooth_time_series(df, alpha=0.4):
     return df.assign(slant=df.groupby("site")["slant"].ewm(alpha=alpha).mean().values)
 
 
@@ -72,7 +73,7 @@ def melt_data_for_figure(df, z_score=1.96):
 def execute_formating():
     df = pd.concat(
         [
-            pd.read_csv("data/output/monthly_slant_pred_" + str(year) + ".csv")
+            pd.read_csv("data/output/Q_slant_pred_" + str(year) + ".csv")
             for year in range(2010, 2022)
         ]
     ).loc[lambda x: x["se.fit"] != 0]
@@ -153,7 +154,7 @@ plt.annotate(
     xy=(3, 1),
     xycoords="axes fraction",
     xytext=(0.66, 0.3),
-    textcoords="axes fraction"
+    textcoords="axes fraction",
 )
 plt.annotate(
     "magyaridok.hu\nchanges name to mno.hu",
@@ -164,5 +165,3 @@ plt.annotate(
 )
 
 plt.savefig("figures/" + figname)
-
-
