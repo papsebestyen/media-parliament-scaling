@@ -72,10 +72,11 @@ parldata["comment"] = parldata["text_comm"].apply(
 )
 parldata["text_strip"] = parldata["text_comm"].apply(lambda x: x[0])
 
-parldata = parldata.filter(
-    ["date", "speaker", "speaker_party", "type", "bill_title", "text_strip"]
-)
+# parldata = parldata.filter(
+#     ["date", "speaker", "speaker_party", "type", "bill_title", "text_strip"]
+# )
 
 Path('./data/raw').mkdir(exist_ok=False)
 
 parldata.to_csv("data/raw/parliament_speeches_2010-2020.csv", index=False)
+parldata.to_parquet("data/raw/parliament_speeches_2010-2020.parquet", index=False)
