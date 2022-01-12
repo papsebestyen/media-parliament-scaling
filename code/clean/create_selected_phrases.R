@@ -1,5 +1,5 @@
 renv::activate()
-rm(list=ls())
+rm(list = ls())
 
 library(dplyr)
 library(ggplot2)
@@ -9,50 +9,49 @@ library(quanteda.textstats)
 library(quanteda.textplots)
 library(tidyverse)
 library(gofastr)
+library(writexl)
 
 parl_tokens <- read_rds("data/intermed/parliament_tokens.rds")
 
-# bigramm 
-toks_2gram <- tokens_ngrams(parl_tokens, n = 2)
+# bigramm
 
-bi_dtm <- dfm(toks_2gram) %>%
+bigram_keyness <- tokens_ngrams(parl_tokens, n = 2) %>% 
+  dfm() %>%
   dfm_group(groups = side) %>%
-  dfm_trim(groups = side, min_termfreq = 20) 
+  dfm_trim(groups = side, min_termfreq = 20) %>% 
+  textstat_keyness(target = 1, measure = "chi2")
 
-bigram_keyness <- bi_dtm %>% textstat_keyness(target=1, measure="chi2")
+# trigramm
 
-textplot_wordcloud(dfm_group(bi_dtm, groups = side), comparison = TRUE, max_words = 100)
-
-# trigramm 
-
-toks_3gram <- tokens_ngrams(parl_tokens, n = 3)
-
-dtm_3gram <- dfm(toks_3gram) %>%
+trigram_keyness <- tokens_ngrams(parl_tokens, n = 3) %>% 
+  dfm() %>%
   dfm_group(groups = side) %>%
-  dfm_trim(groups = side, min_termfreq = 20) 
-
-trigram_keyness <- dtm_3gram %>% textstat_keyness(target=1,measure="chi2") 
-
-wordplot <- textplot_keyness(trigram_keyness,n=30,min_count = 5,margin=0.15)
-
-textplot_keyness(trigram_keyness)
-
-# create wordcloud comparison
-dfm_group(dtm_3gram, groups = side) %>% 
-  textplot_wordcloud(comparison = TRUE, max_words = 100)
+  dfm_trim(groups = side, min_termfreq = 5) %>%
+  textstat_keyness(target = 1, measure = "chi2")
 
 
 # Create final n=2000 phrase list
 
-bigrams <- bigram_keyness %>% mutate(feature = str_replace_all(feature,"_"," "))
-trigrams <- trigram_keyness %>% mutate(feature = str_replace_all(feature,"_"," "))
+bigrams <- bigram_keyness %>% mutate(feature = str_replace_all(feature, "_", " "))
+trigrams <- trigram_keyness %>% mutate(feature = str_replace_all(feature, "_", " "))
 
-bigrams <-  rbind(head(bigrams, 500), tail(bigrams, 500))
-trigrams <-  rbind(head(trigrams, 500), tail(trigrams, 500))
+bigrams <- rbind(head(bigrams, 500), tail(bigrams, 500))
+trigrams <- rbind(head(trigrams, 500), tail(trigrams, 500))
 
-p <- data.frame(cbind(c(bigrams$feature,trigrams$feature)))
+p <- data.frame(cbind(c(bigrams$feature, trigrams$feature)))
 colnames(p)[1] <- "p"
-p$p <- str_replace_all(p$p," ","_") 
-selected_ps <-prep_stopwords(p %>% select(p))
+p$p <- str_replace_all(p$p, " ", "_")
+selected_ps <- prep_stopwords(p %>% select(p))
 
 selected_ps %>% write_rds("data/intermed/selected_phrases.rds")
+
+
+features_table <- cbind(bigrams, trigrams)
+features_table <- cbind(head(features_table, 60), tail(features_table, 60))
+
+features_table %>% write_xlsx("data/intermed/top_khi_phrases_raw.xlsx")
+
+
+
+
+
