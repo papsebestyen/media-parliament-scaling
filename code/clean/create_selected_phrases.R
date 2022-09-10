@@ -11,47 +11,92 @@ library(tidyverse)
 library(gofastr)
 library(writexl)
 
-parl_tokens <- read_rds("data/intermed/parliament_tokens.rds")
+create_ngramm <- function(toks, ngram, min_termfreq){
+  ngram_keyness <- tokens_ngrams(parl_tokens, n = ngram) %>% 
+    dfm() %>%
+    dfm_group(groups = side) %>%
+    dfm_trim(groups = side, min_termfreq = min_termfreq) %>% 
+    textstat_keyness(target = 1, measure = "chi2")
+  return(ngram_keyness)
+}
 
-# bigramm
+create_phrases <- function(bigrams, trigrams, first_n = 500, last_n = 500){
+  bigrams <- bigram_keyness %>% mutate(feature = str_replace_all(feature, "_", " "))
+  trigrams <- trigram_keyness %>% mutate(feature = str_replace_all(feature, "_", " "))
+  
+  bigrams <- rbind(head(bigrams, first_n), tail(bigrams, last_n))
+  trigrams <- rbind(head(trigrams, first_n), tail(trigrams, last_n))
+  
+  p <- data.frame(cbind(c(bigrams$feature, trigrams$feature)))
+  colnames(p)[1] <- "p"
+  p$p <- str_replace_all(p$p, " ", "_")
+  selected_ps <- prep_stopwords(p %>% select(p))
+  return(selected_ps)
+}
 
-bigram_keyness <- tokens_ngrams(parl_tokens, n = 2) %>% 
-  dfm() %>%
-  dfm_group(groups = side) %>%
-  dfm_trim(groups = side, min_termfreq = 20) %>% 
-  textstat_keyness(target = 1, measure = "chi2")
+save_phrases <- function(bigrams, trigrams, path, first_n = 60, last_n = 60){
+  bigrams <- bigrams %>% mutate(feature = str_replace_all(feature, "_", " "))
+  trigrams <- trigrams %>% mutate(feature = str_replace_all(feature, "_", " "))
+  
+  bigrams <- rbind(head(bigrams, first_n), tail(bigrams, last_n))
+  trigrams <- rbind(head(trigrams, first_n), tail(trigrams, last_n))
+  
+  features_table <- cbind(bigrams, trigrams)
+  features_table <- cbind(head(features_table, 60), tail(features_table, 60))
+  features_table %>% write_xlsx(path)
+}
 
-# trigramm
+# Migration ---------------------------------------------------------------
 
-trigram_keyness <- tokens_ngrams(parl_tokens, n = 3) %>% 
-  dfm() %>%
-  dfm_group(groups = side) %>%
-  dfm_trim(groups = side, min_termfreq = 5) %>%
-  textstat_keyness(target = 1, measure = "chi2")
+parl_tokens <- read_rds("data/intermed/parliament_tokens_migration.rds")
+
+bigram_keyness <- create_ngramm(parl_tokens, 2, 20)
+trigram_keyness <- create_ngramm(parl_tokens, 3, 5)
+
+selected_ps <- create_phrases(bigram_keyness, trigram_keyness)
+selected_ps %>% write_rds("data/intermed/selected_phrases_migration.rds")
+
+save_phrases(bigram_keyness, trigram_keyness, "data/intermed/top_khi_phrases_raw_migration.xlsx")
+
+# Religion ----------------------------------------------------------------
+
+parl_tokens <- read_rds("data/intermed/parliament_tokens_religion.rds")
+
+bigram_keyness <- create_ngramm(parl_tokens, 2, 20)
+trigram_keyness <- create_ngramm(parl_tokens, 3, 5)
+
+selected_ps <- create_phrases(bigram_keyness, trigram_keyness)
+selected_ps %>% write_rds("data/intermed/selected_phrases_religion.rds")
+
+save_phrases(bigram_keyness, trigram_keyness, "data/intermed/top_khi_phrases_raw_religion.xlsx")
+
+# Environment -------------------------------------------------------------
+
+parl_tokens <- read_rds("data/intermed/parliament_tokens_environment.rds")
+
+bigram_keyness <- create_ngramm(parl_tokens, 2, 20)
+trigram_keyness <- create_ngramm(parl_tokens, 3, 5)
+
+selected_ps <- create_phrases(bigram_keyness, trigram_keyness)
+selected_ps %>% write_rds("data/intermed/selected_phrases_environment.rds")
+
+save_phrases(bigram_keyness, trigram_keyness, "data/intermed/top_khi_phrases_raw_environment.xlsx")
+
+# TODO --------------------------------------------------------------------
+
+# LDA
+# Értelmes szavak
+# TH a keywordre
+
+# Validáció:
+# Manifesto
+# V-DEM
+
+# ESS
 
 
-# Create final n=2000 phrase list
 
-bigrams <- bigram_keyness %>% mutate(feature = str_replace_all(feature, "_", " "))
-trigrams <- trigram_keyness %>% mutate(feature = str_replace_all(feature, "_", " "))
-
-bigrams <- rbind(head(bigrams, 500), tail(bigrams, 500))
-trigrams <- rbind(head(trigrams, 500), tail(trigrams, 500))
-
-p <- data.frame(cbind(c(bigrams$feature, trigrams$feature)))
-colnames(p)[1] <- "p"
-p$p <- str_replace_all(p$p, " ", "_")
-selected_ps <- prep_stopwords(p %>% select(p))
-
-selected_ps %>% write_rds("data/intermed/selected_phrases.rds")
-
-
-features_table <- cbind(bigrams, trigrams)
-features_table <- cbind(head(features_table, 60), tail(features_table, 60))
-
-features_table %>% write_xlsx("data/intermed/top_khi_phrases_raw.xlsx")
-
-
+quanteda::as.list(parl_tokens) %>% View()
 
 
 

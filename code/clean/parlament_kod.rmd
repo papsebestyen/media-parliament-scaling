@@ -1,0 +1,222 @@
+---
+title: "gentz"
+author: "Kofi"
+date: '2021 12 30 '
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(quanteda)
+require(quanteda.textmodels)
+library(quanteda.textstats)
+library(quanteda.textplots)
+library(tidyverse)
+library(gofastr)
+```
+
+
+```{r}
+parl_text <- read_csv("C:/Rajk - újgép/Gentzkow prep course - újgép/parlament_corpus/parlament_speech_2018-2020.csv") %>% 
+  filter(type == "vezérszónoki felszólalás" 
+         | type == "felszólalás" 
+         | type == "elhangzik az interpelláció/kérdés/azonnali kérdés"
+         | type == "azonnali kérdésre adott képviselői viszonválasz" 
+         | type == "azonnali kérdésre adott képviselői viszonválasz"
+         | type == "kétperces felszólalás" 
+         | type == "kérdés megválaszolva" 
+         | type == "napirend előttihez hozzászólás" 
+         | type == "napirend előtti felszólalás" 
+         | type == "napirend előtti felszólalás"
+         | type == "azonnali kérdésre adott miniszteri viszonválasz"
+         | type == "napirend utáni felszólalás" 
+         | type == "Előadói válasz"
+         | type == "előterjesztő nyitóbeszéde" 
+         | type == "interpelláció szóban megválaszolva") %>%
+  select(c("date", "speaker_party", "speaker", "text_strip","type")) %>%
+  dplyr::rename(text = text_strip) %>% 
+  drop_na() %>% 
+  mutate (name = str_replace_all(speaker,"Dr. ",""),
+          month = substr(date,6,7))
+```
+
+```{r}
+corpus <- corpus(parl_text %>% select(text))
+docvars(corpus, "speaker_party") <- parl_text$speaker_party
+docvars(corpus, "speaker") <- parl_text$speaker
+docvars(corpus, 'date') <- parl_text$date
+
+toks <- tokens(corpus)
+```
+
+
+
+# LMBTQ -------------------------------------------------------------------
+
+```{r}
+kwic(toks, pattern = 'férfi', window = 3)
+
+lmbtq.toks <- phrase(c('meleg pár.*', 'melegek.*', 'meleg.* férfi', 'meleg.* nő', 'lmbtq', 'homosz.*', 'homof.*'))
+lmbtq.kwic <- kwic(toks, pattern = lmbtq.toks, window = 3, valuetype = 'regex')
+lmbtq.kwic
+
+kwic(toks, pattern = 'felmeleg', window = 3, valuetype = 'regex')
+
+corpus_subset(corpus, docnames(corpus) %in% lmbtq.kwic$docname) %>% docvars()
+
+lmbtq.kwic$docname
+```
+
+
+# Migration ---------------------------------------------------------------
+#  Kofi
+
+```{r}
+
+migrans_toks <- phrase(c('migr.*', 'menek.*', 'beván.*'))
+migrans_kwic <- kwic(toks, pattern = migrans_toks, window = 3, valuetype = 'regex')
+migrans_kwic
+
+kwic(toks, pattern = 'terror', window = 3, valuetype = 'regex')
+```
+
+
+# Religion ----------------------------------------------------------------
+#  Kofi
+
+```{r}
+
+vallas_toks <- phrase(c('^vallás.*', '^hitük', "hitvallás", 'keresztény', "muszlim", "muzulmán", "zsidó", "katolikus", "^egyház", "református"))
+vallas_kwic <- kwic(toks, pattern = vallas_toks, window = 3, valuetype = 'regex')
+vallas_kwic
+
+kwic(toks, pattern = 'Isten', window = 3, valuetype = 'regex')
+```
+
+
+# 2. Scaling model -> party - #  Kofi
+
+## create_parliament_tokens
+
+```{r}
+rm(parl_text)
+
+swords <- append(
+  scan("C:/Rajk - újgép/Gentzkow prep course - újgép/Ádi mappa/media-parliament-scaling-main/data/stopwords/stopwords-hu.txt", what="", sep="\n"),
+  scan("C:/Rajk - újgép/Gentzkow prep course - újgép/Ádi mappa/media-parliament-scaling-main/data/stopwords/stopwords-parliament.txt", what="", sep="\t")
+  ) %>% 
+  prep_stopwords()
+
+sphrases <- scan("C:/Rajk - újgép/Gentzkow prep course - újgép/Ádi mappa/media-parliament-scaling-main/data/stopwords/stopphrases-parliament.txt", what="", sep="\t") %>% 
+  prep_stopwords()
+
+speaker_names <- read_csv("C:/Rajk - újgép/Gentzkow prep course - újgép/Ádi mappa/media-parliament-scaling-main/data/stopwords/representative_names_2018-2020.csv")$Név %>%
+  tolower() %>% 
+  prep_stopwords()
+
+parl_tokens <- tokens(corpus, 
+                      remove_punct = T,
+                      remove_symbols = T,
+                      remove_numbers = T,
+                      remove_separators = T) %>% 
+               tokens_tolower() %>% 
+               tokens_select(pattern = phrase(sphrases), selection = "remove") %>% 
+               tokens_select(pattern = phrase(speaker_names), selection = "remove") %>% 
+               tokens_select(pattern = swords, selection = "remove") %>% 
+               tokens_wordstem(language = 'hu')
+
+parl_tokens %>% write_rds("C:/Rajk - újgép/Gentzkow prep course - újgép/parliament_tokens.rds")
+```
+
+## create_selected_phrases
+
+```{r}
+parl_tokens <- read_rds("C:/Rajk - újgép/Gentzkow prep course - újgép/parliament_tokens.rds")
+
+# bigramm 
+toks_2gram <- tokens_ngrams(parl_tokens, n = 2)
+
+bi_dtm <- dfm(toks_2gram) %>%
+  dfm_group(groups = side) %>%
+  dfm_trim(groups = side, min_termfreq = 20) 
+
+bigram_keyness <- bi_dtm %>% textstat_keyness(target=1, measure="chi2")
+
+textplot_wordcloud(dfm_group(bi_dtm, groups = side), comparison = TRUE, max_words = 100)
+
+# trigramm 
+
+toks_3gram <- tokens_ngrams(parl_tokens, n = 3)
+
+dtm_3gram <- dfm(toks_3gram) %>%
+  dfm_group(groups = side) %>%
+  dfm_trim(groups = side, min_termfreq = 20) 
+
+trigram_keyness <- dtm_3gram %>% textstat_keyness(target=1,measure="chi2") 
+
+wordplot <- textplot_keyness(trigram_keyness,n=30,min_count = 5,margin=0.15)
+
+textplot_keyness(trigram_keyness)
+
+# create wordcloud comparison
+dfm_group(dtm_3gram, groups = side) %>% 
+  textplot_wordcloud(comparison = TRUE, max_words = 100)
+
+
+# Create final n=2000 phrase list
+
+bigrams <- bigram_keyness %>% mutate(feature = str_replace_all(feature,"_"," "))
+trigrams <- trigram_keyness %>% mutate(feature = str_replace_all(feature,"_"," "))
+
+bigrams <-  rbind(head(bigrams, 500), tail(bigrams, 500))
+trigrams <-  rbind(head(trigrams, 500), tail(trigrams, 500))
+
+p <- data.frame(cbind(c(bigrams$feature,trigrams$feature)))
+colnames(p)[1] <- "p"
+p$p <- str_replace_all(p$p," ","_") 
+selected_ps <-prep_stopwords(p %>% select(p))
+
+selected_ps %>% write_rds("C:/Rajk - újgép/Gentzkow prep course - újgép/selected_phrases.rds")
+```
+
+## train_wordscore_model
+
+```{r}
+parl_tokens <- read_rds("C:/Rajk - újgép/Gentzkow prep course - újgép/parliament_tokens.rds")
+selected_ps <- read_rds("C:/Rajk - újgép/Gentzkow prep course - újgép/selected_phrases.rds")
+
+# Create phrase frequencies of selected phrases in parliament text
+
+phrase_frequency_table_parliament <- parl_tokens %>%
+  tokens_ngrams(n=2:3) %>%
+  tokens_select(pattern = phrase(selected_ps), selection = "keep") %>% 
+  dfm()
+
+# train wordscore model
+tmod_ws <- textmodel_wordscores(phrase_frequency_table_parliament, 
+                                y = phrase_frequency_table_parliament$label,
+                                smooth = 0)
+
+tmod_ws %>% write_rds("data/output/wordscore_fit.rds")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

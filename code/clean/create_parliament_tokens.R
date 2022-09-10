@@ -6,7 +6,7 @@ library(quanteda)
 library(tidyverse)
 library(gofastr)
 
-parl_text <- read_csv("data/raw/parliament_speeches_2010-2020.csv") %>%
+parl_text <- read_csv("data/raw/parliament_speeches_2010-2020_2.csv") %>%
   filter(type == "vezérszónoki felszólalás" |
     type == "felszólalás" |
     type == "elhangzik az interpelláció/kérdés/azonnali kérdés" |
@@ -42,8 +42,9 @@ parl_text <- read_csv("data/raw/parliament_speeches_2010-2020.csv") %>%
   ) %>%
   drop_na(govt_opp, text)
 
+
 # drop jobbik here
-parl_text <- parl_text %>% filter(speaker_party != "Jobbik")
+# parl_text <- parl_text %>% filter(speaker_party != "Jobbik")
 
 parl_text %>%
   select(-text) %>%
@@ -56,21 +57,23 @@ docvars(corpus, "side") <- parl_text$govt_opp
 docvars(corpus, "side_quarter") <- parl_text$govt_opp_quarter
 docvars(corpus, "label") <- parl_text$govt
 docvars(corpus, "date") <- parl_text$date
+docvars(corpus, "bill_title") <- parl_text$bill_title
+docvars(corpus, 'year') <- parl_text$year
+docvars(corpus, 'date_origin') <- parl_text$date_origin
 
 rm(parl_text)
 
 swords <- append(
-  scan("data/stopwords/stopwords-hu.txt", what = "", sep = "\n"),
-  scan("data/stopwords/stopwords-parliament.txt", what = "", sep = "\t")
+  scan("data/stopwords/stopwords-hu.txt", what = "", sep = "\n", encoding = 'UTF-8'),
+  scan("data/stopwords/stopwords-parliament.txt", what = "", sep = "\t", encoding = 'UTF-8')
 ) %>%
   prep_stopwords()
 
-sphrases <- scan("data/stopwords/stopphrases-parliament.txt", what = "", sep = "\t") %>%
+sphrases <- scan("data/stopwords/stopphrases-parliament.txt", what = "", sep = "\t", encoding = 'UTF-8') %>%
   prep_stopwords()
 
 speaker_names <- rbind(
-  read_csv("data/input/representative_names_2014-2018.csv"),
-  read_csv("data/input/representative_names_2018-2020.csv")
+  read_csv("data/raw/representatives_names_2010-2020.csv")
 )$Név %>%
   tolower() %>%
   prep_stopwords()
@@ -88,3 +91,4 @@ parl_tokens <- tokens(corpus,
   tokens_wordstem(language = "hu")
 
 parl_tokens %>% write_rds("data/intermed/parliament_tokens.rds")
+

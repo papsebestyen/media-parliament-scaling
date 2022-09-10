@@ -11,11 +11,11 @@ import seaborn as sns
 
 z_score = 1.96
 alpha = 1
-figname = "slant_estimates_government_opposition.png"
+figname = "migrant_slant_estimates_government_opposition.png"
 
 
 df = (
-    pd.read_csv("data/slant_estimates/party_slant_pred.csv")
+    pd.read_csv("data/slant_estimates/migrant_party_slant_pred.csv")
     .assign(
         side=lambda x: x["party_quarter"].str.split("_").str[0],
         date=lambda x: pd.to_datetime(
